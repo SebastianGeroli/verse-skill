@@ -122,6 +122,7 @@ Three folders: `language/` (the Verse language + `/Verse.org` native API), `uefn
 | `reference/language/effects-failure-concurrency.md` | any effect specifier, `<decides>`/failure, STM rollback, `sync`/`race`/`rush`/`spawn`/`branch`, `event`/`listenable`, `first`, live variables/`when`/`upon`/`await` |
 | `reference/language/verse-org.md` | the `/Verse.org` native API: `Print`/`Err`, math, strings/arrays, event & async interfaces, `result`, `agent`/`player`/`session`/`team`, tags, `@editable` family, SpatialMath, colors, assets, random |
 | `reference/uefn/toolchain.md` | API digests, the build/verify loop, build/LSP staleness, project & module layout (reserved folders, asset-folder modules, `modules.verse`), publishing contract, persistence limits, the two VMs |
+| `reference/uefn/asset-reflection.md` | how project assets surface in `Assets.digest.verse`: material parameters, mesh material slots, Niagara user params, WBP variables, prefabs, audio; skipped-parameter and name-collision gotchas |
 | `reference/apis/scene-graph.md` | entities, components, lifecycle, hierarchy queries, scene events, `tick_events`, collision/overlap/sweep, tags, transforms, the two SpatialMath namespaces, built-in components (mesh/light/sound/particle/interactable/stackable/keyframed-movement), skeletal animation |
 | `reference/apis/characters-combat.md` | `fort_character`, damage/health/shield, playspaces, teams, round manager, animation, vehicles, respawn/lobby |
 | `reference/apis/ai.md` | NPCs: `npc_behavior`, navigation (`navigatable` vs `npc_actions_component`), guard actions/awareness/alert levels, focus/leash, sidekicks, spark mode, NPC spawner devices |
@@ -132,7 +133,9 @@ Three folders: `language/` (the Verse language + `/Verse.org` native API), `uefn
 | `reference/apis/devices.md` | `creative_device`/`creative_prop`, the 193-device catalog (categorized), CreativeAnimation, Patchwork |
 | `reference/apis/ui.md` | UI widgets (canvas/stack_box/text_block/…), `player_ui`, HUD control, styled buttons |
 | `reference/apis/input.md` | player input: `GetPlayerInput`, `input_action(t)`/`input_mapping` assets, `input_events` state machine, built-in mappings (weapon/traversal/UI/hotbar), `ControlInput`, input-method detection, viewport project/deproject |
-| `reference/apis/engine.md` | `log`/`debug_draw`, curves, deprecated SpatialMath, JSON, WebAPI, LLM NPCs (Conversations), quests, basic shapes, `SortBy` |
+| `reference/apis/engine.md` | `log`/`debug_draw`, curves, deprecated SpatialMath, JSON, WebAPI, basic shapes, `SortBy` |
+| `reference/apis/conversations.md` | LLM NPCs: `persona_component` (prompt/say/moderation events), `ai_session` (history, `Prompt`, `RegisterAction` tool binding), `@ai_description`, voices, `ai_error` |
+| `reference/apis/progression.md` | quests: the three-layer split (participation / authorable `basic_quest` / Fortnite quest log), objectives, rewards, participants, persistence caveats |
 | `reference/gotchas.md` | quick lookup of the mistakes that most often break Verse code (and the right idiom) |
 | `reference/patterns.md` | idiomatic plumbing patterns (event-reactive component skeleton, cancelable subscriptions, manager lookup, per-player data association incl. the state-entity proxy workaround, typed results, declarative UI, input, recursive sync/race, utils helpers) |
 

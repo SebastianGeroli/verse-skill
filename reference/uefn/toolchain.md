@@ -10,7 +10,7 @@ Verse-in-UEFN specifics: the build/verify loop, API digests, project/module layo
 
 ## Digest = source of truth, and it's versioned
 
-The authoritative signatures live in the generated `*.digest.verse` files for your project's build (`Verse.digest.verse`, `UnrealEngine.digest.verse`, `Fortnite.digest.verse`, plus your project's `Assets.digest.verse`). The digests referenced while writing this skill were build `++Fortnite+Release-42.00-CL-57316517`. **If a symbol/overload isn't in your digest, regenerate the digests from the current build** before assuming it's missing — the engine adds APIs frequently, and many carry `@available{MinUploadedAtFNVersion := N}` gates and `@experimental`. To find a symbol fast, `grep` the digest rather than reading it whole (the Fortnite digest is ~11.5k lines). Bundled digests often lag the build a project targets.
+The authoritative signatures live in the generated `*.digest.verse` files for your project's build (`Verse.digest.verse`, `UnrealEngine.digest.verse`, `Fortnite.digest.verse`, plus your project's `Assets.digest.verse`). The digests referenced while writing this skill were build `++Fortnite+Release-42.00-CL-57316517`. **If a symbol/overload isn't in your digest, regenerate the digests from the current build** before assuming it's missing — the engine adds APIs frequently, and many carry `@available{MinUploadedAtFNVersion := N}` gates and `@experimental`. To find a symbol fast, `grep` the digest rather than reading it whole (the Fortnite digest is ~12.4k lines). Bundled digests often lag the build a project targets. How project assets (materials, meshes, Niagara, WBPs, prefabs, …) reflect into `Assets.digest.verse` as Verse classes/constants: `asset-reflection.md` (same folder).
 
 ## Build & verify loop
 

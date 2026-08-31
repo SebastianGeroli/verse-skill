@@ -1,0 +1,41 @@
+# Asset Reflection — how UEFN assets become Verse API
+
+Every UEFN project generates an `Assets.digest.verse` reflecting Content Browser assets into Verse classes and constants. This is how you reference materials, meshes, particle systems, prefabs, WBP widgets, textures, sounds and animations from code — and the digest is the only reliable way to learn the generated names and shapes.
+
+> **Digest = source of truth.** Open your project's `Assets.digest.verse` (see `toolchain.md`); it regenerates per build, and a published island keeps a separate `<Project>-Published-Assets` snapshot digest alongside the working one.
+
+## Overall shape
+
+- **Content Browser folders are modules**, mirrored as nested `module:` blocks; assets at the content root land at digest file-root. This is why an asset folder named `UI` or `Towers` collides with any code identifier of the same name (`../gotchas.md` → Mutability & bindings).
+- **Everything is `<scoped {/youraccount@fortnite.com/Project}>`** — package-private, usable from your Verse code but never publishable in a public API signature. Projects not claimed by an account/team show the placeholder `<scoped {/invaliddomain/Project}>`.
+- Two artifact kinds per asset, often **paired**: a plain constant `X_asset:some_type = external {}` (pass to APIs taking the asset *value* type) and/or a generated `X := class(...)` (instantiate/configure in code). `external {}` means "value provided by the engine".
+- **`@import_as("/Project/Path/BP_X.BP_X_C")`** binds a generated class to its Blueprint class — informational; you use the Verse name.
+- **Auto-qualified names**: when reflection would collide with a sibling (e.g. a material named `MatID_1` next to mesh slots also named `MatID_1`), the digest declares it qualified — `var (/Project/Assets/Pickaxe/SomeMesh:)MatID_1<public>:material`. Copy the qualified form at *every* use, exactly as printed (same rule as `../gotchas.md` qualification).
+
+## Reflection shapes by asset kind
+
+| Asset | Generates | Members |
+|---|---|---|
+| **Material (instance or parent)** | `M_X := class<scoped{...}>(material)` | each overridable parameter → `@editable var Param<public>:t = external {}`; scalar→`float`, vector→`color`, texture→`texture`. Parameterless materials get an empty body. |
+| **Static mesh** | `SM_X_asset:mesh = external {}` **and** `SM_X := class<final>(mesh_component)` | material slots → `@editable var SlotName<public>:material` (often auto-qualified, see above) |
+| **Niagara system** | `NS_X_asset:particle_system = external {}` **and** `NS_X := class<public>(particle_system_component)` | user-exposed Niagara parameters → `@editable var Param<public>:t` |
+| **Entity prefab** | `EP_X := class<final><concrete>(entity)` (empty body) **and** `EP_X_asset:entity_prefab = external {}` | none — instantiate `EP_X{}` and `Parent.AddEntities(array{...})` |
+| **Widget Blueprint (WBP/UMG)** | `UW_X := class(widget)` | exposed Blueprint variables → `var X<public>:t` (Text→`message`, bool→`logic`, LinearColor→`color`, float/texture/material as-is). No events/functions reflect — interactivity stays in the BP graph; read state back via `logic` vars (`WasClicked`-style). |
+| **Sound (audio asset setup)** | `X := class<final><public>(sound_component)` | `@editable var PitchBase/PitchRandomSpread:float`, `var Sounds:[]sound_wave` |
+| **Texture** | `T_X:texture = external {}` constant | — |
+| **Animation sequence** | `X:animation_sequence = external {}` constant | — |
+
+## Using reflected assets
+
+- **Materials**: instantiate the generated class with an archetype and mutate params with `set` — `Mat := M_Highlight{}` … `set Mat.ValidColor = NamedColors.Green` — then apply: on a Scene Graph mesh, assign the reflected slot var (`set MyMesh.MatID_1 = Mat`, or bind at construction); on a `creative_prop`, `Prop.SetMaterial(Mat, ?Index)`. The base `material`/`particle_system`/`animation_sequence` classes are `<epic_internal>` — only reflected subclasses/constants give you values.
+- **Meshes**: the `_asset:mesh` constant feeds `creative_prop.SetMesh` and `mesh`-typed `@editable`s; the `mesh_component` subclass is what you `AddComponents` to an entity.
+- **Particles**: `SpawnParticleSystem(NS_X_asset, Position, ...)` (`/UnrealEngine.com/Assets`) for fire-and-forget; add the `particle_system_component` subclass to an entity for a configured, controllable emitter (`Play`/`Stop`).
+- **WBP widgets**: construct via archetype (set the exposed vars) and add like any widget (`player_ui.AddWidget`, container slots — `../apis/ui.md`).
+- **Textures**: `texture_block.SetImage(T_X)`, `has_icon`, `@editable` texture fields. **Animations**: feed `PlaySkeletalAnimation` / `PlayAnimation` (`../apis/scene-graph.md`, `../apis/characters-combat.md`).
+
+## Gotchas
+
+- **Invalid identifiers are silently skipped.** A parameter/property whose name isn't a valid Verse identifier does not reflect; the digest records it in an embedded comment: `<#> MI_Arch contain properties that were not reflected. Some parameters ... were skipped due to being an invalid identifier: 'NormalMap Strength'`. Spaces and auto-generated GUID-suffixed material slots (`'Mesh-acb755bf-...-material_0'`) are the usual culprits. Fix: rename the parameter/slot in the editor to a plain identifier, rebuild, re-check the digest.
+- **A "missing" param usually means a stale digest or a skipped identifier** — check the `<#>` comments before assuming the API doesn't exist, and regenerate digests after any asset change (`toolchain.md`).
+- **Reflected classes are code-constructible but editor-authored** — you can't add fields or override members; treat the generated class as a value type you configure.
+- **`@editable` on reflected vars cuts both ways**: a reflected component subclass placed via the editor exposes those params in the details panel, so a designer can override what your code assumes.

@@ -8,6 +8,7 @@ Claude loads `SKILL.md` on its own when a task touches Verse or UEFN, and reads 
 - `reference/language/effects-failure-concurrency.md`: effect specifiers, failure, STM rollback, concurrency, events, live variables
 - `reference/language/verse-org.md`: the `/Verse.org` native API — core functions, math, events, simulation, SpatialMath, input
 - `reference/uefn/toolchain.md`: API digests, the build/verify loop, project and module layout, publishing, the two VMs
+- `reference/uefn/asset-reflection.md`: how project assets reflect into Verse — material params, WBP variables, Niagara user params
 - `reference/apis/scene-graph.md`: entities, components, lifecycle, queries, scene events, transforms
 - `reference/apis/characters-combat.md`: fort_character, damage/health, playspaces, teams, animation, vehicles
 - `reference/apis/ai.md`: NPCs — behaviors, navigation, guard actions/awareness, sidekicks, spawner devices
@@ -18,7 +19,9 @@ Claude loads `SKILL.md` on its own when a task touches Verse or UEFN, and reads 
 - `reference/apis/devices.md`: creative_device, creative_prop, the categorized 193-device catalog
 - `reference/apis/ui.md`: UI widgets, player_ui, HUD control
 - `reference/apis/input.md`: player input — actions/mappings, input events, built-in mappings, input-method detection
-- `reference/apis/engine.md`: diagnostics/debug_draw, JSON, WebAPI, curves, quests, SortBy
+- `reference/apis/engine.md`: diagnostics/debug_draw, JSON, WebAPI, curves, SortBy
+- `reference/apis/conversations.md`: LLM NPCs — persona_component, ai_session, tool binding, voices
+- `reference/apis/progression.md`: quests — objectives, rewards, participants, quest log
 - `reference/gotchas.md`: common mistakes and the right idiom (cross-cutting)
 - `reference/patterns.md`: component and system patterns (cross-cutting)
 
