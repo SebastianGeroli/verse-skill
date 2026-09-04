@@ -114,7 +114,7 @@ Entity.FindAncestorEntitiesWithTag(tag_type)           # generator(entity)
 A lightweight message bus distinct from `listenable` events:
 
 ```verse
-my_event<public> := class(scene_event):  Payload:int      # scene_event is an interface
+my_event<public> := class(scene_event) { Payload:int }    # scene_event is an interface
 # send (each returns logic — true if any participant consumed it):
 Entity.SendDown(my_event{Payload := 5})  # this entity's components, then each child (recursive)
 Entity.SendUp(my_event{...})             # this entity's components, then up to parent
@@ -181,7 +181,7 @@ Entity.FindSweepHits(Displacement, StartGlobalTransform, Volume)
 ```verse
 Probe := collision_sphere{ Radius := 5.0, CollisionProfile := VisibilityOverlapAll }
 Hits  := Sim.FindSweepHits(Delta, StartTransform, Probe)
-if (Hit := first{ H : Hits }):  Place(Hit.ContactPosition, Hit.ContactNormal)
+if (Hit := first{ H : Hits }). Place(Hit.ContactPosition, Hit.ContactNormal)
 ```
 
 `mesh_component` exposes overlap **events**: `EntityEnteredEvent`/`EntityExitedEvent : listenable(entity)` (needs `Queryable := true`).

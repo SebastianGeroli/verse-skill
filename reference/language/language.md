@@ -5,12 +5,14 @@ Core language: types, literals, variables, operators, functions, classes, module
 ## Block syntax (3 interchangeable forms)
 
 ```verse
-if (X). DoThing()          # dot-space (single expression)
-if (X): DoThing()          # colon + indented block
-if (X) { DoThing() }       # braces
+if (X). DoThing()          # dot-space: single expression, same line
+if (X):                    # colon: MUST be followed by a newline —
+    DoThing()              #   opens a multi-line indented scope
+    DoOther()
+if (X) { DoThing() }       # braces: inline or multi-line
 ```
 
-Works everywhere blocks appear (`if`, `for`, `case`, function/class bodies, `sync`/`race` arms…). `=` can be followed by an indented block:
+These are three spellings of a **block argument**, and every macro-style construct takes one — not just control flow. The full set: `if`/`else`, `for`, `loop`, `case` arms, `sync`/`race`/`rush` arms, `spawn`/`branch`, `option`/`logic`/`block`/`defer`, **`using`**, `profile`, literal builders (`array`/`map` — e.g. `Slots := array:` with one element per line), and definition bodies (function `=`, `class`, `module`, `interface`, `enum`). So `using { Item_Assets }` = `using. Item_Assets` = `using:` + an indented path on the next line (one path per `using`, in every form), and `spawn{F()}` = `spawn. F()`. **Form rules:** `. ` holds exactly one expression on the same line; `:` only works when followed by a newline (it creates the multi-line indented scope — `macro: Expr` inline is not the colon form); `{}` works inline or across lines. `=` can be followed by an indented block:
 
 ```verse
 F(X:int):int =
@@ -159,7 +161,7 @@ Create("Bob", ?Level := 5)                                       # call with nam
 - **Extension methods:** `(V:int).Double():int = V*2` then `5.Double()`. Class methods take precedence. These are how the engine adds methods to `entity`/`agent`/etc. (e.g. `Agent.GetFortCharacter[]`).
 - **Generics:** `Id(X:t where t:type):t = X`; constrain with `t:subtype(comparable)`. `[VVM]` supports higher-order/complex parametric; `[BPVM]` errors on some.
 - **Lambdas:** `A=>B` is a value, `a->b` is a **type**. In BetaVerse, `=>` lambdas are only implemented in map literals (`map{"a"=>1}`); use **nested functions** for closures (`[VVM]` only; `[BPVM]` has no nested functions). Nested functions capture `var`s by reference.
-- **Cross-VM closure encoding: a class with fields.** Where other languages pass a closure (parser combinators, heuristics, strategies), define an abstract class/interface with one method and capture the "environment" as fields: `either := class(string_parser): A:string_parser; B:string_parser; Parse<override>(...) = A.Parse[In] or B.Parse[In]`. Construction *is* the capture. For plain function values, top-level named functions fit `type{_(:t)<decides>:void}`-shaped fields (comparator injection: `avl_tree(int){Less := IntLess}`) — that's also the pattern for missing type-class constraints like ordering.
+- **Cross-VM closure encoding: a class with fields.** Where other languages pass a closure (parser combinators, heuristics, strategies), define an abstract class/interface with one method and capture the "environment" as fields: `either := class(string_parser) { A:string_parser; B:string_parser; Parse<override>(...) = A.Parse[In] or B.Parse[In] }`. Construction *is* the capture. For plain function values, top-level named functions fit `type{_(:t)<decides>:void}`-shaped fields (comparator injection: `avl_tree(int){Less := IntLess}`) — that's also the pattern for missing type-class constraints like ordering.
 - Intrinsics (`Abs`, `Min`, `Max`, `Clamp`, `Mod`, `Sqrt`, `Pow`, `Exp`, `Log`, `Log10`, `Sin`/`Cos`/`Tan`/`ArcTan2`, `PiFloat`, `Print`, `Err`, `ToString`, `Concatenate`, …) aren't first-class — wrap to store.
 - **Overloading is by *parameter types only*, never by effects.** Types that all accept `false` are **indistinct** for overload resolution and collide: `logic`, `?t`, `[]t`, `[k]v`, `true`, `void`; so does interface-vs-implementing-class and any subtype relation. Refined types make valid overloads only when the refinements are **disjoint** (overlapping = ambiguous). You **cannot reference an overloaded name, extension method, or intrinsic without calling it** (not first-class).
 - **Argument evaluation order:** positional (left→right), then named (in written order), then defaults (in parameter order). No duplicate parameter names; no attributes on parameters; refined (`where`) types aren't allowed in destructured tuple params; an empty-tuple param needs `()` at the call site (`F(5, ())`).
@@ -199,7 +201,7 @@ Override rules: can narrow return type, can **reduce** (not add) effects, can't 
 - **Diamond interface inheritance:** duplicated fields are merged; conflicting methods still need `<override>`.
 - **Same-named members from DIFFERENT interfaces don't merge** — implementing two interfaces that each declare `Enable():void` requires two fully-qualified implementations: `(a_iface:)Enable<override>():void = ...` and `(b_iface:)Enable<override>():void = ...` (delegate both to one private helper). One unqualified `Enable<override>` does not satisfy both.
 - **Specifier evolution asymmetries** (post-publish): `<final>`/`<unique>`/`<final_super>` are **add-only**, `<abstract>` is **remove-only** (you may make a class concrete but never abstract), `<castable>` is irreversible. `GetCastableFinalSuperClass()` returns the most-specific `<final_super>` for versioning.
-- **`enum`**: `color := enum: Red; Green; Blue` → value `color.Red`. `<closed>` (default, exhaustive `case`) vs `<open>` (needs wildcard/`<decides>`). `[BPVM]` caps enums at **256 enumerators**; `[VVM]` has no limit. A reserved-word enumerator uses `(keyword_enum:)public`; attribute scopes are `@attribscope_enum` (the type) vs `@attribscope_enumerator` (values).
+- **`enum`**: `color := enum{Red, Green, Blue}` → value `color.Red`. `<closed>` (default, exhaustive `case`) vs `<open>` (needs wildcard/`<decides>`). `[BPVM]` caps enums at **256 enumerators**; `[VVM]` has no limit. A reserved-word enumerator uses `(keyword_enum:)public`; attribute scopes are `@attribscope_enum` (the type) vs `@attribscope_enumerator` (values).
 
 **`case`** pattern matching (on `int`/`logic`/`char`/`string`/enums/refinements — **not** float/objects/tuples):
 
@@ -214,19 +216,19 @@ case (Mode):
 
 ```verse
 if (Cond) then A else B            # expression form
-if (C): Then else: Else            # block form; Cond must be FAILABLE
-for (X : Arr): F(X)                # iterate; returns []result
-for (I -> V : Arr): ...            # index->value (arrays) / key->value (maps)
-for (I := 0..N-1): ...             # range domain uses :=  (collections use :)
-for (X : Arr, X > 0): F(X)         # filter clause (failable)
+if (C). Then                       # dot form for a one-line body; Cond must be FAILABLE
+for (X : Arr). F(X)                # iterate; returns []result
+for (I -> V : Arr). F(I, V)        # index->value (arrays) / key->value (maps)
+for (I := 0..N-1). F(I)            # range domain uses :=  (collections use :)
+for (X : Arr, X > 0). F(X)         # filter clause (failable)
 first (X : Arr, Pred[X]) { X }     # first success; <decides>; fails if none
-loop: ...; if (Done). break        # only loop has break; every stmt must succeed
+loop { Step(); if (Done). break }  # only loop has break; every stmt must succeed
 ```
 
 - **`for` is an expression returning an array** of body results. **No `break`/`continue`/`return`.** Setup failure → no iterations; filter failure → skip; body failure → result not added.
 - **Range domains bind with `:=`**, collection iteration pulls with `:`. `for (I := 0..N-1)` not `for (I : 0..N-1)`.
 - **`loop`** is the only construct with `break` (`break` has bottom type, takes no args — use a `var` to carry a result out). **Every statement in a `loop:` body must succeed** — wrap any `<decides>` op in `if(...)`. No `<decides>` directly in a loop body.
-- **No reverse ranges:** `for (I := 0..N-1): Process(N-1-I)`.
+- **No reverse ranges:** `for (I := 0..N-1). Process(N-1-I)`.
 - **`case` scrutinee must NOT be failable**, and a **closed enum is exhaustiveness-checked** (omitting a case is an error; a redundant `_` may be flagged). Open enums need `_`.
 - **`for` with multiple range domains is a cartesian product:** `for (X := 1..3, Y := 1..3). (X,Y)` yields 9 tuples. Iteration order is guaranteed: arrays sequential, **maps in insertion order**, strings char-by-char.
 - **`loop` must contain a non-`break` statement** (a loop whose only statement is `break` is invalid). `loop` retracts the *surrounding* failure context, so any failable op inside (indexing, comparison, integer `/`, failable let-RHS) must be guarded with `if`. Evaluation is always lexical (left→right, top→bottom). `if (logic{X?})` is rejected — `logic{}` removes failability, and an `if` condition must be failable.
@@ -242,12 +244,12 @@ loop: ...; if (Done). break        # only loop has break; every stmt must succee
   do:
       Item
   ```
-- **`for` evaluates to the array of its body values**, so drop the manual accumulator when the body is a clean 1:1 map: write `for(...): X` (or `for: … do: … X`) and let the for-expression *be* the result (often the function's last expression) instead of `var Acc:[]t = array{}; for(...): set Acc += array{X}`. Nested `for`s flatten into one multi-source `for` (a flat-map). Keep an accumulator only when the body appends conditionally or mutates other state.
+- **`for` evaluates to the array of its body values**, so drop the manual accumulator when the body is a clean 1:1 map: write `for(...). X` (or the multi-line `for:`/`do:` block) and let the for-expression *be* the result (often the function's last expression) instead of `var Acc:[]t = array{}; for(...). set Acc += array{X}`. Nested `for`s flatten into one multi-source `for` (a flat-map). Keep an accumulator only when the body appends conditionally or mutates other state.
 
 ## Modules, `using`, paths
 
 - A **folder is a module**; all `.verse` files in it share the module scope. Module bodies hold definitions only (no executable statements). Nest modules to mirror folders.
-- **`using { /Verse.org/SceneGraph }`** (absolute), `using { ../UI/MainMenu }` (relative), `using { Gameplay.Stats }` (by module name). Statement-level; parent before nested; not transitive.
+- **`using { /Verse.org/SceneGraph }`** (absolute), `using { ../UI/MainMenu }` (relative), `using { Gameplay.Stats }` (by module name). Statement-level; parent before nested; not transitive. Like every block construct, `using` accepts all three block spellings — `using { X }`, `using. X`, or `using:` with the path indented on the next line — but **always exactly one path per `using`** (even the `:` form's scope holds a single path; multiple imports = multiple `using` statements).
 - **Access:** `<public>`, `<internal>` (default — module-only), `<protected>`/`<private>` (class-only), `<scoped{M1,M2}>`, `<epic_internal>`. Read/write split: `var<internal> Health<public>:int = 100` — write accessibility **can** be narrowed on override, read accessibility **cannot**. Access specifiers **can't** apply to local variables. `<scoped{}>` is **module-level only** (not inside class defs) and its code can reach out but outside code can't reach in; `<epic_internal>` ≈ `<scoped{/Fortnite.com,/UnrealEngine.com,/Verse.org}>` (so `/User@…/` content can't touch it).
 - **Constructor accessibility:** an uninitialized (no-default) field must be **at least as accessible as the constructor**. The factory idiom `my_type := class<internal>` gives a public type with an internal constructor. A `<public>` definition **cannot expose an `<internal>` type** in its signature.
 - **Paths & qualifiers:** definitions live at paths like `/User@Fortnite.com/MyProject/...`. Disambiguate with `(module:)F()`, `(super:)M()`, `(local:)X`, or a full path `(/MyProject/Utils:)Helper()`. A common idiom is a **module alias** used as a qualifier, e.g. `(LUF:)vector3{...}` to pin the Forward/Left/Up SpatialMath `vector3`.

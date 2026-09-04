@@ -27,7 +27,7 @@ my_component<public> := class<final_super>(component):
         set Subs = array{}
 ```
 
-- **Do NOT write tick loops** (`loop: CheckStuff(); Sleep(0.1)`). Polling for change is the imperative habit leaking back in — Verse's model is **event-reactive systems** and **gameplay expressed over time** with structured concurrency (`Await`, `race`, `sync`, plain sequencing). A `Sleep`-cadence loop is only right when the *effect itself* is periodic (a pulse every 2s), never for detecting state changes. Frame-coupled work that must run before/after physics uses `tick_events` — the exception, not the default.
+- **Do NOT write tick loops** (`loop { CheckStuff(); Sleep(0.1) }`). Polling for change is the imperative habit leaking back in — Verse's model is **event-reactive systems** and **gameplay expressed over time** with structured concurrency (`Await`, `race`, `sync`, plain sequencing). A `Sleep`-cadence loop is only right when the *effect itself* is periodic (a pulse every 2s), never for detecting state changes. Frame-coupled work that must run before/after physics uses `tick_events` — the exception, not the default.
 - **Two ways to consume events — pick per use case.** The stored `Subs:[]cancelable` + `Subscribe(callback)` shape fits callbacks whose lifetime is the component's: subscribe in `OnBeginSimulation`/`OnAddedToScene`, cancel in the matching teardown. Events that are part of a *flow* are better `Await`ed inside a coroutine — `OnSimulate`, a `race` arm, a `branch` — where structured concurrency does the teardown for you.
 - Lifecycle methods are `<no_rollback>` — no `<decides>` work that needs rollback.
 
@@ -231,7 +231,7 @@ Interfaces you want queryable this way must be declared `interface<castable>(p_i
 
 ## Conventions
 
-- **Folder = module**, mirrored by a `modules.verse` declaring the nested module tree (`Gameplay := module: Stats := module: ...`).
+- **Folder = module**, mirrored by a `modules.verse` declaring the nested module tree (`Gameplay := module:` with `Stats := module:` indented beneath it, one level per folder).
 - Types `snake_case`, members `PascalCase`; private fields `var<private> X<private>`.
 - Generators are taken with the `first` macro (`first{ X : Gen }`); maps lose keys via `.RemoveKey`.
 - Packages publish under `/yourname@fortnite.com/ProjectName/...` — cross-package imports use that full path.
