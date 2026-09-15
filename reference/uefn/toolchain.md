@@ -12,6 +12,12 @@ Verse-in-UEFN specifics: the build/verify loop, API digests, project/module layo
 
 The authoritative signatures live in the generated `*.digest.verse` files for your project's build (`Verse.digest.verse`, `UnrealEngine.digest.verse`, `Fortnite.digest.verse`, plus your project's `Assets.digest.verse`). The digests referenced while writing this skill were build `++Fortnite+Release-42.00-CL-57316517`. **If a symbol/overload isn't in your digest, regenerate the digests from the current build** before assuming it's missing — the engine adds APIs frequently, and many carry `@available{MinUploadedAtFNVersion := N}` gates and `@experimental`. To find a symbol fast, `grep` the digest rather than reading it whole (the Fortnite digest is ~12.4k lines). Bundled digests often lag the build a project targets. How project assets (materials, meshes, Niagara, WBPs, prefabs, …) reflect into `Assets.digest.verse` as Verse classes/constants: `asset-reflection.md` (same folder).
 
+**On-disk location (Windows):** UEFN writes these per-project under `%LOCALAPPDATA%\UnrealEditorFortnite\Saved\VerseProject\<ProjectName>\Digests\`, i.e. `C:\Users\<WindowsUsername>\AppData\Local\UnrealEditorFortnite\Saved\VerseProject\<ProjectName>\Digests\`. Two subfolders:
+- `BuiltIn\Fortnite\Fortnite.digest.verse`, `BuiltIn\UnrealEngine\UnrealEngine.digest.verse`, `BuiltIn\Verse\Verse.digest.verse` — the three engine API layers above.
+- `<ProjectName>-Assets\<ProjectName>-Assets.digest.verse` — the project's own reflected assets (see `asset-reflection.md`).
+
+`<ProjectName>` is the UEFN project name, not the repo folder name, if they differ. Read/grep these directly when a symbol's exact signature, module path, or class hierarchy needs checking — don't guess from usage elsewhere in the codebase alone, especially for native engine components (e.g. a component named like an item can actually be a sub-inventory container — `inventory_component` subclasses such as `fort_inventory_harvest_tool_component` hold `GetEquippedItems()`, they aren't markers on the item entity itself).
+
 ## Build & verify loop
 
 Never report Verse as compiling without building it. With the **`ue-editor` MCP server** connected: `VerseToolset.BuildAll` → fix `Error` diagnostics → repeat; `SessionToolset.PushChanges` + `GetClientLogEntries` for runtime truth. The full protocol is in `SKILL.md` (top section) and the **unreal-mcp** skill. Without the MCP, say the code is unverified.
