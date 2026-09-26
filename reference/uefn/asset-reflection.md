@@ -47,7 +47,31 @@ Default to authoring UI as a Widget Blueprint (UMG) and reflecting it into Verse
           Payload := Slot.ClickedEvent.Await()
           OnSlotClicked(Payload)
   ```
-  If many call sites need callback-style subscription, write a small helper in your own project: an extension on `event(t)` that spawns that loop and returns a `cancelable`. End the loop by racing it against a cancel `event()`, not by polling a flag with `Sleep`.
+  If many call sites need callback-style subscription (so the result can sit in a `[]cancelable` alongside real `Subscribe` handles), add a small reusable helper to the project. This version compiles and doesn't poll:
+  ```verse
+  # Cancel is <transacts>, where neither Signal nor spawn is allowed, so it can only flip a flag.
+  event_subscription := class(cancelable):
+      var <private>Canceled<public> : logic = false
+      Cancel<override>()<transacts>:void=
+          set Canceled = true
+
+  (Event:event(t) where t:type).SubscribeEvent<public>(Callback(:t):void):cancelable=
+      Subscription := event_subscription{}
+      spawn{ RunSubscription(Event, Callback, Subscription) }
+      Subscription
+
+  # After Cancel, the listener exits on the next signal without invoking Callback.
+  RunSubscription(Event:event(t), Callback(:t):void, Subscription:event_subscription where t:type)<suspends>:void=
+      loop:
+          Payload := Event.Await()
+          if(Subscription.Canceled?):
+              break
+          Callback(Payload)
+  ```
+  - **Why not wake the listener from `Cancel`?** `cancelable.Cancel` is `<transacts>`. Both `Event.Signal` and the `spawn` macro are no-rollback there (error 3512), and `task(t)` has no `Cancel` method. `Cancel` can only change state.
+  - **The tradeoff:** a cancelled listener stays suspended until the event fires once more, then exits. That costs nothing per frame, and the callback never runs after `Cancel`. A listener on an event that never fires again stays parked, holding a reference to that event. That's fine for widgets that live as long as the player.
+  - **Don't "fix" this by racing the loop against a `Sleep(0.0)` flag check.** It cleans up within a frame but wakes every active subscription every frame.
+  - Name the helper so it doesn't collide with any existing `Subscribe` in scope; Verse forbids shadowing.
 - **Passive display-only elements** (a HUD hint, a static label) need no Verse Fields at all — just instantiate the reflected `WBP_X` class and `set` its exposed vars. Remember that a value set through the archetype (`WBP_X{ Field := V }`) may not push through its MVVM binding on creation; `set` it again after construction if it doesn't show.
 - **Toolchain**: create/duplicate/edit the WBP itself with the `UMGToolSet` MCP toolset (list_properties → get_properties → set_properties on any widget/slot it returns); author the Verse Fields and their MVVM bindings with `VerseFieldsToolset`. After either, the new/changed members only show up in Verse once the digest regenerates — rebuild (`VerseToolset.BuildAll`) before trusting a "missing member" error.
 - **`UMGToolSet.AddWidget` can't construct Blueprint-generated widget classes** (`UEFN_TextBlock_C`, `UEFN_Button_Regular_C`, any project `WBP_X`) — it errors `Can't construct a widget using the passed class because it is unsupported`, even though `ListWidgetClasses`/`GetWidgetClassInfo` both report the class as valid. It works fine for native engine panel/leaf classes (`/Script/UMG.CanvasPanel`, `/Script/UMG.StackBox`, `/Script/UMG.Image`, `/Script/FNE_UILibrary.ActionWidget`, …). **Workaround**: `AddWidget` a native placeholder (e.g. `/Script/UMG.Image`) into the target slot, then `ReplaceWidgetWithTemplate` to swap it for the Blueprint class — that path succeeds (the `unmatchedProperties`/`unmatchedFunctions` it reports back are expected noise from the type swap, not failures). Then `RenameWidget` it to a sensible name.
