@@ -47,31 +47,65 @@ Default to authoring UI as a Widget Blueprint (UMG) and reflecting it into Verse
           Payload := Slot.ClickedEvent.Await()
           OnSlotClicked(Payload)
   ```
-  If many call sites need callback-style subscription (so the result can sit in a `[]cancelable` alongside real `Subscribe` handles), add a small reusable helper to the project. This version compiles and doesn't poll:
+  If many call sites need callback-style subscription (so the result can sit in a `[]cancelable` alongside real `Subscribe` handles), add a small reusable helper to the project. This version compiles, doesn't poll, and leaves nothing running once it's disposed:
   ```verse
-  # Cancel is <transacts>, where neither Signal nor spawn is allowed, so it can only flip a flag.
-  event_subscription := class(cancelable):
+  # Lets a disposer end a listener immediately, from a non-transactional context.
+  stoppable<public> := interface<castable>:
+      Stop<public>():void
+
+  # Cancel is <transacts>, where neither Signal nor spawn is allowed, so it can only flip a flag
+  # (the listener then exits on the next signal). Stop signals, ending the listener right away.
+  event_subscription := class(cancelable, stoppable):
       var <private>Canceled<public> : logic = false
+      StopEvent<private> : event() = event(){}
+
       Cancel<override>()<transacts>:void=
           set Canceled = true
+
+      Stop<override>():void=
+          set Canceled = true
+          StopEvent.Signal()
+
+      AwaitStop()<suspends>:void=
+          StopEvent.Await()
 
   (Event:event(t) where t:type).SubscribeEvent<public>(Callback(:t):void):cancelable=
       Subscription := event_subscription{}
       spawn{ RunSubscription(Event, Callback, Subscription) }
       Subscription
 
-  # After Cancel, the listener exits on the next signal without invoking Callback.
+  # The task sleeps until the event or Stop fires; no per-frame work.
   RunSubscription(Event:event(t), Callback(:t):void, Subscription:event_subscription where t:type)<suspends>:void=
-      loop:
-          Payload := Event.Await()
-          if(Subscription.Canceled?):
-              break
-          Callback(Payload)
+      race:
+          loop:
+              Payload := Event.Await()
+              if(Subscription.Canceled?):
+                  break
+              Callback(Payload)
+          Subscription.AwaitStop()
+
+  # The owner's disposer prefers Stop, falling back to Cancel for ordinary cancelables.
+  subscriptions := class(disposable):
+      var Items<private> : []cancelable = array{}
+      Add<public>(Item:cancelable)<transacts>:void=
+          set Items += array{ Item }
+      Dispose<override>():void=
+          for(Item : Items):
+              if(Stoppable := stoppable[Item]):
+                  Stoppable.Stop()
+              else:
+                  Item.Cancel()
+          set Items = array{}
   ```
-  - **Why not wake the listener from `Cancel`?** `cancelable.Cancel` is `<transacts>`. Both `Event.Signal` and the `spawn` macro are no-rollback there (error 3512), and `task(t)` has no `Cancel` method. `Cancel` can only change state.
-  - **The tradeoff:** a cancelled listener stays suspended until the event fires once more, then exits. That costs nothing per frame, and the callback never runs after `Cancel`. A listener on an event that never fires again stays parked, holding a reference to that event. That's fine for widgets that live as long as the player.
-  - **Don't "fix" this by racing the loop against a `Sleep(0.0)` flag check.** It cleans up within a frame but wakes every active subscription every frame.
+  - **Why `Stop` in addition to `Cancel`:** `cancelable.Cancel` is `<transacts>`. Both `Event.Signal` and the `spawn` macro are no-rollback there (error 3512), and `task(t)` has no `Cancel` method, so `Cancel` alone can only set a flag. The listener would then sit parked until the event fired again, which may be never once the widget is gone. `Dispose()` has no effect specifiers (no-rollback), so it can signal, and `Stop` ends the task immediately. `Cancel` still works for callers that only hold a `cancelable`: the callback never runs after it.
+  - **Don't "fix" this by racing the loop against a `Sleep(0.0)` flag check.** It cleans up within a frame, but it wakes every active subscription every frame for as long as the widget exists.
   - Name the helper so it doesn't collide with any existing `Subscribe` in scope; Verse forbids shadowing.
+- **Nothing a player's UI spawns may outlive the player.** Live servers see constant join/leave churn, so anything left running per departed player piles up for the whole session. The lifecycle rules:
+  - Keep every subscription handle; never discard the `cancelable` a `Subscribe`/`SubscribeEvent` returns.
+  - Store handles in the owning widget's disposer.
+  - A parent widget's `Dispose` must also dispose its child and slot wrappers.
+  - The per-player UI manager calls `Dispose` from its player-removed handler.
+  - Build widgets and slot pools once per player and reuse them across open/close (hide by removing from `player_ui`). Rebuilding on every open multiplies the handles you have to manage.
 - **Passive display-only elements** (a HUD hint, a static label) need no Verse Fields at all — just instantiate the reflected `WBP_X` class and `set` its exposed vars. Remember that a value set through the archetype (`WBP_X{ Field := V }`) may not push through its MVVM binding on creation; `set` it again after construction if it doesn't show.
 - **Toolchain**: create/duplicate/edit the WBP itself with the `UMGToolSet` MCP toolset (list_properties → get_properties → set_properties on any widget/slot it returns); author the Verse Fields and their MVVM bindings with `VerseFieldsToolset`. After either, the new/changed members only show up in Verse once the digest regenerates — rebuild (`VerseToolset.BuildAll`) before trusting a "missing member" error.
 - **`UMGToolSet.AddWidget` can't construct Blueprint-generated widget classes** (`UEFN_TextBlock_C`, `UEFN_Button_Regular_C`, any project `WBP_X`) — it errors `Can't construct a widget using the passed class because it is unsupported`, even though `ListWidgetClasses`/`GetWidgetClassInfo` both report the class as valid. It works fine for native engine panel/leaf classes (`/Script/UMG.CanvasPanel`, `/Script/UMG.StackBox`, `/Script/UMG.Image`, `/Script/FNE_UILibrary.ActionWidget`, …). **Workaround**: `AddWidget` a native placeholder (e.g. `/Script/UMG.Image`) into the target slot, then `ReplaceWidgetWithTemplate` to swap it for the Blueprint class — that path succeeds (the `unmatchedProperties`/`unmatchedFunctions` it reports back are expected noise from the type swap, not failures). Then `RenameWidget` it to a sensible name.
